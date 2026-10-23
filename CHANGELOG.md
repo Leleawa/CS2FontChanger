@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- 新增可选 Regular/Bold 双字体导入与自动字重排序，保留单字体用法；菜单支持单独导入、移除粗体。
+- 新增字体样式、OS/2 字重、斜体和可变字体元数据识别，优先读取 typographic family 名称。
+- 两种字重使用独立文件名部署，保留 TTF/OTF 扩展名；在字体匹配前保留字重并处理 Bold/Black 等命名变体，统一缩放规则。
+- 备份改为临时文件写入后发布，备份失败或损坏时停止替换；部署失败时尝试回滚，校验覆盖所有字体和配置。
+- 还原前读取并校验 ZIP 内容与路径，避免在发现损坏备份前清空字体目录。
+- 新增可选本机默认配置读取，支持字体与缩放设置；个人配置及字体目录不纳入 Git。
+- Added optional Regular/Bold imports, weight detection, separate deployment files, and weight-aware Fontconfig mappings.
+- Failed/corrupt backups now stop deployment; failed writes attempt rollback, and restoration validates payloads before cleanup.
+- Added optional machine-local font and scale defaults, with personal configuration and assets excluded from Git.
+
 ## v3.10（2026-10-05）
 
 ### 中文

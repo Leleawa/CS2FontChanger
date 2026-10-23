@@ -38,9 +38,27 @@ CS2 Font Changer allows you to easily customize the font display in Counter-Stri
 ## 🚀 Usage
 
 1. Download the latest version of the program
-2. Prepare font files in `.ttf` or `.otf` format
-3. Drag and drop font files onto the program icon, or follow the interface prompts to import after launching
-4. Press [Enter] to apply and enjoy your new game fonts!
+2. Prepare a regular `.ttf` or `.otf` font and, optionally, a bold font
+3. Press **[1]** to import regular, **[4]** to import bold, or **[5]** to remove bold. You can also drag one font or both fonts onto the program icon; a pair is sorted by its embedded weight, regardless of filename or argument order
+4. Set the game path with **[2]**, adjust font scaling with **[3]**, then press **[Enter]** to apply
+
+Two-font mode accepts upright static regular fonts with weight up to 500 and bold fonts with weight 600 or higher. The menu displays the detected family, style and weight. Different family names are supported. Single-font mode remains available and leaves missing weights to the font engine's fallback behavior; variable-font axes and separate italic faces are not configured by this version.
+
+```powershell
+.\cs2_font_changer.exe "C:\Fonts\Example-Regular.ttf" "C:\Fonts\Example-Bold.ttf"
+```
+
+The faces are deployed under separate `cs2fc-regular` and `cs2fc-bold` filenames, preserving their TTF/OTF extension. Mapping uses the requested weight before font matching, including named Bold/Black variants, following the [Fontconfig configuration model](https://fontconfig.pages.freedesktop.org/fontconfig/fontconfig-user.html). A failed backup stops replacement; a failed deployment attempts to restore the previous fonts and configuration. Original fonts can still be restored with **[0]** or by importing `backup_original_fonts.zip`.
+
+Optional local defaults can be saved as `cs2_font_changer.local.conf` beside the executable:
+
+```ini
+regular_font = fonts/Example-Regular.ttf
+bold_font = fonts/Example-Bold.ttf
+ui_scale = 1.0
+```
+
+All entries are optional; `bold_font` requires a regular font. Font paths resolve relative to the configuration file, and dragged-in fonts override the configured fonts while keeping the configured scale. The configuration and the `.local/` directory are ignored by Git. No personal fonts or presets are bundled with the program.
 
 ## 🛠️ Build from Source
 
@@ -51,6 +69,8 @@ cargo build --release
 ```
 
 The single-file executable will be at `target/release/cs2_font_changer.exe` (~350 KB, no runtime dependencies).
+
+Run `cargo test` for font parsing, paired deployment, backup/restore and rollback checks. On Windows, `python tests/verify_fontconfig.py "<game-root>\game\bin\win64\libfontconfig-1.dll"` then checks the generated fixtures against the game's own Fontconfig library, covering same-family, different-family and single-font mappings. This only reads the game library; test files stay under `target/`.
 
 ## 📸 Screenshots
 

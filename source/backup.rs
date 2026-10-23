@@ -6,25 +6,26 @@ use std::path::{Path, PathBuf};
 use zip::write::FileOptions;
 use zip::{ZipArchive, ZipWriter};
 
+use crate::game::get_fonts_paths;
 use crate::i18n;
 use crate::lprintln;
-use crate::game::get_fonts_paths;
 
 pub const BACKUP_FILENAME: &str = "backup_original_fonts.zip";
 
 /// Mirror of Python `create_backup`: walk csgo_fonts and core_fonts, write all files
-/// under `csgo_fonts/` and `core_fonts/` arcnames. Skips silently if the backup already exists.
-pub fn create_backup(install_location: &str) {
+/// under `csgo_fonts/` and `core_fonts/` arcnames. Validate an existing backup before reusing it.
+pub fn create_backup(install_location: &str) -> io::Result<()> {
     let backup_path = Path::new(install_location).join(BACKUP_FILENAME);
     if backup_path.exists() {
-        return;
+        return validate_backup(&backup_path);
     }
 
     lprintln!("{}", i18n::t("backing_up"));
     let paths = get_fonts_paths(install_location);
 
+    let temporary = backup_path.with_extension("zip.partial");
     let result = (|| -> io::Result<()> {
-        let file = fs::File::create(&backup_path)?;
+        let file = fs::File::create(&temporary)?;
         let mut zip = ZipWriter::new(file);
         let options: FileOptions = FileOptions::default()
             .compression_method(zip::CompressionMethod::Deflated)
@@ -36,20 +37,55 @@ pub fn create_backup(install_location: &str) {
         if paths.core_fonts.exists() {
             add_dir_to_zip(&mut zip, &paths.core_fonts, "core_fonts", options)?;
         }
-        zip.finish()?;
+        zip.finish()?.sync_all()?;
+        validate_backup(&temporary)?;
+        fs::rename(&temporary, &backup_path)?;
         Ok(())
     })();
 
     match result {
-        Ok(_) => lprintln!(
-            "{}",
-            i18n::t_with(
-                "backup_created",
-                &[("backup_path", &backup_path.to_string_lossy())]
-            )
-        ),
-        Err(e) => crate::print_error(&i18n::t("backup_error"), Some(&e)),
+        Ok(_) => {
+            lprintln!(
+                "{}",
+                i18n::t_with(
+                    "backup_created",
+                    &[("backup_path", &backup_path.to_string_lossy())]
+                )
+            );
+            Ok(())
+        }
+        Err(e) => {
+            let _ = fs::remove_file(&temporary);
+            Err(e)
+        }
     }
+}
+
+/// Read every payload to check decompression and CRC before accepting a backup.
+fn validate_backup(path: &Path) -> io::Result<()> {
+    let mut archive = ZipArchive::new(fs::File::open(path)?)?;
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i)?;
+        let name = file.name();
+        let relative = name
+            .strip_prefix("csgo_fonts/")
+            .or_else(|| name.strip_prefix("core_fonts/"))
+            .ok_or_else(|| {
+                io::Error::new(io::ErrorKind::InvalidData, "Unrecognized backup entry")
+            })?;
+        if file.enclosed_name().is_none()
+            || relative.starts_with(['/', '\\'])
+            || name.contains(':')
+            || name.replace('\\', "/").split('/').any(|part| part == "..")
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Unsafe backup entry",
+            ));
+        }
+        io::copy(&mut file, &mut io::sink())?;
+    }
+    Ok(())
 }
 
 fn add_dir_to_zip<W: io::Write + io::Seek>(
@@ -62,7 +98,12 @@ fn add_dir_to_zip<W: io::Write + io::Seek>(
         let entry = entry?;
         let path = entry.path();
         if path.is_dir() {
-            add_dir_to_zip(zip, &path, &format!("{}/{}", prefix, entry.file_name().to_string_lossy()), options)?;
+            add_dir_to_zip(
+                zip,
+                &path,
+                &format!("{}/{}", prefix, entry.file_name().to_string_lossy()),
+                options,
+            )?;
         } else {
             let arcname = format!("{}/{}", prefix, entry.file_name().to_string_lossy());
             zip.start_file(&arcname, options)?;
@@ -91,6 +132,11 @@ pub fn restore_backup(install_location: &str, backup_path_override: Option<&str>
                 &[("backup_path", &backup_path.to_string_lossy())]
             )
         );
+        return false;
+    }
+
+    if let Err(e) = validate_backup(&backup_path) {
+        crate::print_error(&i18n::t("restore_error"), Some(&e));
         return false;
     }
 
@@ -181,6 +227,10 @@ pub fn restore_backup(install_location: &str, backup_path_override: Option<&str>
             let mut src = archive
                 .by_name(name)
                 .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
+            if src.is_dir() {
+                fs::create_dir_all(&target)?;
+                continue;
+            }
             let mut dst = fs::File::create(&target)?;
             io::copy(&mut src, &mut dst)?;
         }
@@ -194,7 +244,9 @@ pub fn restore_backup(install_location: &str, backup_path_override: Option<&str>
 
     // If the backup didn't include 42-repl-global.conf, remove any custom one still on disk
     let repl_conf = paths.core_fonts.join("42-repl-global.conf");
-    if !namelist.iter().any(|n| n == "core_fonts/42-repl-global.conf")
+    if !namelist
+        .iter()
+        .any(|n| n == "core_fonts/42-repl-global.conf")
         && repl_conf.exists()
         && fs::remove_file(&repl_conf).is_ok()
     {

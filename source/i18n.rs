@@ -62,6 +62,16 @@ fn lookup(lang: Lang, key: &str) -> &'static str {
 }
 
 const ZH_MESSAGES: &[(&str, &str)] = &[
+    ("local_defaults_failed", "读取本机默认设置失败，将使用通用默认值"),
+    ("menu_regular", "导入常规字体 (Regular)"),
+    ("menu_bold", "导入可选粗体 (Bold，先选择常规字体)"),
+    ("menu_clear_bold", "移除粗体，恢复单字体模式"),
+    ("bold_fallback", "未导入，沿用字体引擎回退"),
+    ("invalid_font_pair", "请选择一个有效的 TTF/OTF 字体，或一组直立静态常规体（字重 ≤ 500）与粗体（字重 ≥ 600）；最多两个文件。菜单中请先导入常规字体。"),
+    ("file_deployed", "已写入：{file}"),
+    ("rollback_complete", "替换失败，已恢复替换前的字体和配置"),
+    ("rollback_failed", "自动回滚失败，请使用原始字体备份还原"),
+
     ("auto_detect_failed", "未能自动检测到游戏安装路径，请手动进行选择"),
     ("auto_restore_detect", "检测到备份压缩包，准备执行自动还原"),
     ("backing_up", "正在备份"),
@@ -135,6 +145,16 @@ const ZH_MESSAGES: &[(&str, &str)] = &[
 ];
 
 const EN_MESSAGES: &[(&str, &str)] = &[
+    ("local_defaults_failed", "Could not load local defaults; using standard defaults"),
+    ("menu_regular", "Import regular font"),
+    ("menu_bold", "Import optional bold font (select regular first)"),
+    ("menu_clear_bold", "Remove bold font and use single-font mode"),
+    ("bold_fallback", "Not imported; use font-engine fallback"),
+    ("invalid_font_pair", "Select one valid TTF/OTF font, or an upright static regular (weight <= 500) and bold (weight >= 600) pair; at most two files. Select regular first in the menu."),
+    ("file_deployed", "Written: {file}"),
+    ("rollback_complete", "Replacement failed; previous fonts and configuration restored"),
+    ("rollback_failed", "Automatic rollback failed; restore the original-font backup"),
+
     ("auto_detect_failed", "Auto-detection of game path failed, Please specify the path manually"),
     ("auto_restore_detect", "Backup zip detected, preparing for auto-restore"),
     ("backing_up", "Backing up"),

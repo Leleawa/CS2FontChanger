@@ -1,3 +1,6 @@
 /target
 /cs2_font_changer.exe
 /.zcode/
+/cs2_font_changer.local.conf
+/.local/
+__pycache__/
