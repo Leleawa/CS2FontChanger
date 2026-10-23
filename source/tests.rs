@@ -148,6 +148,7 @@ fn local_defaults_resolve_relative_unicode_paths_and_both_weights() {
     fs::write(&path, "\u{feff}# Local defaults\nregular_font = \"private fonts/常规.ttf\"\nbold_font = private fonts/粗体.otf\nui_scale = 0.9\n").unwrap();
     let defaults = crate::settings::load(&path, true).unwrap().unwrap();
     assert_eq!(defaults.ui_scale, 0.9);
+    assert!(!defaults.test_mode);
     assert!(defaults.fonts.validate());
     assert_eq!(
         defaults.fonts.regular.unwrap().path,
@@ -168,6 +169,7 @@ fn explicit_fonts_override_local_fonts_but_keep_local_scale() {
     assert!(crate::settings::load(&path, true).is_err());
     let defaults = crate::settings::load(&path, false).unwrap().unwrap();
     assert_eq!(defaults.ui_scale, 0.9);
+    assert!(!defaults.test_mode);
     assert!(defaults.fonts.regular.is_none());
     assert!(defaults.fonts.bold.is_none());
 }
@@ -180,6 +182,7 @@ fn missing_and_scale_only_local_defaults_preserve_standard_font_selection() {
     fs::write(&path, "ui_scale=0.9").unwrap();
     let defaults = crate::settings::load(&path, true).unwrap().unwrap();
     assert_eq!(defaults.ui_scale, 0.9);
+    assert!(!defaults.test_mode);
     assert!(defaults.fonts.regular.is_none());
 }
 
@@ -195,6 +198,9 @@ fn invalid_local_defaults_are_rejected() {
         "ui_scale=oops",
         "ui_scale=",
         "unknown=value",
+        "test_mode=yes",
+        "test_mode=1",
+        "test_mode=true\ntest_mode=false",
         "not a setting",
         "ui_scale=1\nui_scale=0.9",
         "regular_font=\"unclosed",
@@ -271,7 +277,7 @@ fn paired_deployment_preserves_both_faces_and_restores_originals() {
     let fonts = fixture.pair();
     let game = fixture.game();
     let paths = get_fonts_paths(&game);
-    deploy::apply(&game, &fonts, 1.1).unwrap();
+    deploy::apply(&game, &fonts, 1.1, false).unwrap();
     assert_eq!(
         fs::read(paths.csgo_fonts.join("cs2fc-regular.ttf")).unwrap(),
         fs::read(&fonts.regular.as_ref().unwrap().path).unwrap()
@@ -303,10 +309,10 @@ fn switching_to_single_font_removes_bold_and_keeps_first_backup() {
     let mut fonts = fixture.pair();
     let game = fixture.game();
     let paths = get_fonts_paths(&game);
-    deploy::apply(&game, &fonts, 1.0).unwrap();
+    deploy::apply(&game, &fonts, 1.0, false).unwrap();
     let backup = fs::read(Path::new(&game).join(BACKUP_FILENAME)).unwrap();
     fonts.bold = None;
-    deploy::apply(&game, &fonts, 1.0).unwrap();
+    deploy::apply(&game, &fonts, 1.0, false).unwrap();
     assert!(!paths.csgo_fonts.join("cs2fc-bold.otf").exists());
     assert_eq!(
         fs::read(Path::new(&game).join(BACKUP_FILENAME)).unwrap(),
@@ -325,7 +331,7 @@ fn sources_inside_game_directory_are_read_before_cleanup() {
         regular: FontFace::load(&regular_path),
         bold: None,
     };
-    deploy::apply(&game, &fonts, 1.0).unwrap();
+    deploy::apply(&game, &fonts, 1.0, false).unwrap();
     assert!(paths.csgo_fonts.join("cs2fc-regular.ttf").is_file());
     assert!(!regular_path.exists());
 }
@@ -337,14 +343,14 @@ fn missing_source_or_corrupt_backup_never_cleans_game_fonts() {
     let game = fixture.game();
     let paths = get_fonts_paths(&game);
     fs::remove_file(&fonts.bold.as_ref().unwrap().path).unwrap();
-    assert!(deploy::apply(&game, &fonts, 1.0).is_err());
+    assert!(deploy::apply(&game, &fonts, 1.0, false).is_err());
     assert_eq!(
         fs::read(paths.csgo_fonts.join("original.ttf")).unwrap(),
         b"original font"
     );
     let fonts = fixture.pair();
     fs::write(Path::new(&game).join(BACKUP_FILENAME), b"broken zip").unwrap();
-    assert!(deploy::apply(&game, &fonts, 1.0).is_err());
+    assert!(deploy::apply(&game, &fonts, 1.0, false).is_err());
     assert_eq!(
         fs::read(paths.csgo_fonts.join("original.ttf")).unwrap(),
         b"original font"
@@ -358,7 +364,7 @@ fn failed_config_write_keeps_previous_fonts() {
     let game = fixture.game();
     let paths = get_fonts_paths(&game);
     fs::create_dir(paths.core_fonts.join("42-repl-global.conf")).unwrap();
-    assert!(deploy::apply(&game, &fonts, 1.0).is_err());
+    assert!(deploy::apply(&game, &fonts, 1.0, false).is_err());
     assert_eq!(
         fs::read(paths.csgo_fonts.join("original.ttf")).unwrap(),
         b"original font"
@@ -400,7 +406,7 @@ fn locked_global_config_rolls_back_after_fonts_and_local_config_were_written() {
         .share_mode(1)
         .open(&global)
         .unwrap();
-    assert!(deploy::apply(&game, &fonts, 1.0).is_err());
+    assert!(deploy::apply(&game, &fonts, 1.0, false).is_err());
     assert_eq!(
         fs::read(paths.csgo_fonts.join("original.ttf")).unwrap(),
         b"original font"
@@ -514,4 +520,124 @@ fn reads_real_windows_regular_and_bold_fonts() {
             }
         }
     }
+}
+
+#[test]
+fn test_mode_defaults_are_validated_even_when_fonts_are_overridden() {
+    let fixture = Fixture::new();
+    let path = fixture.0.join(crate::settings::FILENAME);
+    for (value, expected) in [("true", true), ("false", false)] {
+        fs::write(
+            &path,
+            format!("regular_font=missing.ttf\nui_scale=0.9\ntest_mode={value}"),
+        )
+        .unwrap();
+        let defaults = crate::settings::load(&path, false).unwrap().unwrap();
+        assert_eq!(defaults.test_mode, expected);
+        assert_eq!(defaults.ui_scale, 0.9);
+    }
+    fs::write(&path, "test_mode=true").unwrap();
+    assert!(
+        crate::settings::load(&path, true)
+            .unwrap()
+            .unwrap()
+            .test_mode
+    );
+    fs::write(&path, "test_mode=invalid").unwrap();
+    assert!(crate::settings::load(&path, false).is_err());
+}
+
+#[test]
+fn test_mode_preserves_originals_across_font_and_weight_switches_and_restore() {
+    let fixture = Fixture::new();
+    let mut fonts = fixture.pair();
+    let game = fixture.game();
+    let paths = get_fonts_paths(&game);
+    let foreign = paths.csgo_fonts.join("other-tool.OTF");
+    fs::write(&foreign, b"unrelated font").unwrap();
+    deploy::apply(&game, &fonts, 0.9, true).unwrap();
+    let backup = fs::read(Path::new(&game).join(BACKUP_FILENAME)).unwrap();
+    assert_eq!(
+        fs::read(paths.csgo_fonts.join("cs2fc-regular.ttf")).unwrap(),
+        fs::read(&fonts.regular.as_ref().unwrap().path).unwrap()
+    );
+    assert_eq!(
+        fs::read(paths.csgo_fonts.join("cs2fc-bold.otf")).unwrap(),
+        fs::read(&fonts.bold.as_ref().unwrap().path).unwrap()
+    );
+    // Change format and drop bold: only the program's stale outputs may be removed.
+    fonts.regular = Some(fixture.font("replacement.otf", 400));
+    fonts.bold = None;
+    deploy::apply(&game, &fonts, 1.0, true).unwrap();
+    assert!(!paths.csgo_fonts.join("cs2fc-regular.ttf").exists());
+    assert!(!paths.csgo_fonts.join("cs2fc-bold.otf").exists());
+    assert!(paths.csgo_fonts.join("cs2fc-regular.otf").exists());
+    assert_eq!(
+        fs::read(paths.csgo_fonts.join("original.ttf")).unwrap(),
+        b"original font"
+    );
+    assert_eq!(fs::read(&paths.ui_font).unwrap(), b"original index");
+    assert_eq!(fs::read(&foreign).unwrap(), b"unrelated font");
+    assert_eq!(
+        fs::read(Path::new(&game).join(BACKUP_FILENAME)).unwrap(),
+        backup
+    );
+    let generated = config::generate(&fonts, 1.0);
+    assert_eq!(
+        fs::read_to_string(paths.csgo_fonts.join("fonts.conf")).unwrap(),
+        generated.local
+    );
+    assert_eq!(
+        fs::read_to_string(paths.core_fonts.join("42-repl-global.conf")).unwrap(),
+        generated.global
+    );
+    assert!(restore_backup(&game, None));
+    assert_eq!(
+        fs::read(paths.csgo_fonts.join("original.ttf")).unwrap(),
+        b"original font"
+    );
+    assert_eq!(fs::read(&paths.ui_font).unwrap(), b"original index");
+    assert_eq!(fs::read(&foreign).unwrap(), b"unrelated font");
+    assert_eq!(
+        fs::read(paths.csgo_fonts.join("fonts.conf")).unwrap(),
+        b"original config"
+    );
+    assert!(!paths.csgo_fonts.join("cs2fc-regular.otf").exists());
+}
+
+#[test]
+#[cfg(windows)]
+fn test_mode_failed_redeployment_restores_previous_custom_fonts_and_keeps_originals() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let fixture = Fixture::new();
+    let mut fonts = fixture.pair();
+    let game = fixture.game();
+    let paths = get_fonts_paths(&game);
+    deploy::apply(&game, &fonts, 0.9, true).unwrap();
+    let regular = paths.csgo_fonts.join("cs2fc-regular.ttf");
+    let bold = paths.csgo_fonts.join("cs2fc-bold.otf");
+    let local = paths.csgo_fonts.join("fonts.conf");
+    let global = paths.core_fonts.join("42-repl-global.conf");
+    let originals: Vec<_> = [&regular, &bold, &local, &global]
+        .into_iter()
+        .map(|p| (p, fs::read(p).unwrap()))
+        .collect();
+    let lock = fs::OpenOptions::new()
+        .read(true)
+        .share_mode(1)
+        .open(&global)
+        .unwrap();
+    fonts.regular = Some(fixture.font("replacement.otf", 400));
+    fonts.bold = None;
+    assert!(deploy::apply(&game, &fonts, 1.2, true).is_err());
+    for (path, bytes) in originals {
+        assert_eq!(fs::read(path).unwrap(), bytes);
+    }
+    assert!(!paths.csgo_fonts.join("cs2fc-regular.otf").exists());
+    assert_eq!(
+        fs::read(paths.csgo_fonts.join("original.ttf")).unwrap(),
+        b"original font"
+    );
+    assert_eq!(fs::read(paths.ui_font).unwrap(), b"original index");
+    drop(lock);
 }

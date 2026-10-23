@@ -11,6 +11,7 @@ pub const FILENAME: &str = "cs2_font_changer.local.conf";
 pub struct Defaults {
     pub fonts: FontSelection,
     pub ui_scale: f64,
+    pub test_mode: bool,
 }
 
 /// Relative font paths resolve from the config file, independent of the working
@@ -24,6 +25,7 @@ pub fn load(path: &Path, use_font_defaults: bool) -> io::Result<Option<Defaults>
     let mut regular = None;
     let mut bold = None;
     let mut scale = None;
+    let mut test_mode = None;
     for line in text.trim_start_matches('\u{feff}').lines() {
         let line = line.trim();
         if line.is_empty() || line.starts_with('#') {
@@ -46,6 +48,7 @@ pub fn load(path: &Path, use_font_defaults: bool) -> io::Result<Option<Defaults>
             "regular_font" => &mut regular,
             "bold_font" => &mut bold,
             "ui_scale" => &mut scale,
+            "test_mode" => &mut test_mode,
             _ => return Err(invalid_config()),
         };
         if entry.replace(value.to_string()).is_some() {
@@ -59,6 +62,11 @@ pub fn load(path: &Path, use_font_defaults: bool) -> io::Result<Option<Defaults>
     if !ui_scale.is_finite() || !(0.5..=2.0).contains(&ui_scale) {
         return Err(invalid_config());
     }
+    let test_mode = match test_mode.as_deref() {
+        Some("true") => true,
+        Some("false") | None => false,
+        _ => return Err(invalid_config()),
+    };
 
     let mut fonts = FontSelection::default();
     if use_font_defaults {
@@ -78,12 +86,16 @@ pub fn load(path: &Path, use_font_defaults: bool) -> io::Result<Option<Defaults>
             return Err(invalid_config());
         }
     }
-    Ok(Some(Defaults { fonts, ui_scale }))
+    Ok(Some(Defaults {
+        fonts,
+        ui_scale,
+        test_mode,
+    }))
 }
 
 fn invalid_config() -> io::Error {
     io::Error::new(
         io::ErrorKind::InvalidData,
-        "Invalid local defaults: use regular_font, optional bold_font, and ui_scale (0.5..=2.0)",
+        "Invalid local defaults: use regular_font, optional bold_font, ui_scale (0.5..=2.0), and test_mode (true/false)",
     )
 }

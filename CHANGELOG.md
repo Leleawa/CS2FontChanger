@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- 新增 [6] 测试模式开关：保留现有原字体，仅更新本程序字体与替换配置；支持本机默认设置 `test_mode = true/false`，默认关闭。
+- Added an optional test mode that preserves existing original fonts while refreshing the program's own fonts and replacement configuration.
+
 - 新增可选 Regular/Bold 双字体导入与自动字重排序，保留单字体用法；菜单支持单独导入、移除粗体。
 - 新增字体样式、OS/2 字重、斜体和可变字体元数据识别，优先读取 typographic family 名称。
 - 两种字重使用独立文件名部署，保留 TTF/OTF 扩展名；在字体匹配前保留字重并处理 Bold/Black 等命名变体，统一缩放规则。

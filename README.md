@@ -44,6 +44,8 @@ CS2 Font Changer allows you to easily customize the font display in Counter-Stri
 
 Two-font mode accepts upright static regular fonts with weight up to 500 and bold fonts with weight 600 or higher. The menu displays the detected family, style and weight. Different family names are supported. Single-font mode remains available and leaves missing weights to the font engine's fallback behavior; variable-font axes and separate italic faces are not configured by this version.
 
+**Test mode:** Press **[6]** to toggle preservation of existing fonts (off by default). When enabled, deployment keeps original fonts, including `stratum2.uifont`, and other tools' font files; only this program's `cs2fc-regular`/`cs2fc-bold` outputs are refreshed. Replacement configuration is still generated as usual. This does not recover fonts removed by an earlier deployment: restore the original backup with **[0]**, reopen the program, then enable test mode and apply.
+
 ```powershell
 .\cs2_font_changer.exe "C:\Fonts\Example-Regular.ttf" "C:\Fonts\Example-Bold.ttf"
 ```
@@ -56,9 +58,10 @@ Optional local defaults can be saved as `cs2_font_changer.local.conf` beside the
 regular_font = fonts/Example-Regular.ttf
 bold_font = fonts/Example-Bold.ttf
 ui_scale = 1.0
+test_mode = false
 ```
 
-All entries are optional; `bold_font` requires a regular font. Font paths resolve relative to the configuration file, and dragged-in fonts override the configured fonts while keeping the configured scale. The configuration and the `.local/` directory are ignored by Git. No personal fonts or presets are bundled with the program.
+`test_mode` accepts `true` or `false` and supplies the initial menu setting. All entries are optional; `bold_font` requires a regular font. Font paths resolve relative to the configuration file, and dragged-in fonts override the configured fonts while keeping the configured scale. The configuration and the `.local/` directory are ignored by Git. No personal fonts or presets are bundled with the program.
 
 ## 🛠️ Build from Source
 

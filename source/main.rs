@@ -74,6 +74,7 @@ fn main() {
     let mut location = registry::get_auto_install_location();
     let mut fonts = FontSelection::default();
     let mut ui_scale = 1.0;
+    let mut test_mode = false;
 
     if let Ok(executable) = std::env::current_exe() {
         if let Some(directory) = executable.parent() {
@@ -81,6 +82,7 @@ fn main() {
                 Ok(Some(defaults)) => {
                     fonts = defaults.fonts;
                     ui_scale = defaults.ui_scale;
+                    test_mode = defaults.test_mode;
                 }
                 Ok(None) => {}
                 Err(e) => {
@@ -166,6 +168,18 @@ fn main() {
         if fonts.bold.is_some() {
             lprintln!("\x1b[96m[5]\x1b[0m {}", t("menu_clear_bold"));
         }
+        lprintln!(
+            "\x1b[96m[6]\x1b[0m {}: \x1b[90m{}\x1b[0m",
+            t("menu_test_mode"),
+            t(if test_mode {
+                "test_mode_on"
+            } else {
+                "test_mode_off"
+            })
+        );
+        if test_mode {
+            lprintln!("{}", t("test_mode_hint"));
+        }
         if has_backup {
             lprintln!("\x1b[96m[0]\x1b[0m {}", t("restore_default"));
         }
@@ -173,7 +187,7 @@ fn main() {
             lprintln!("{}", t("menu_start"));
         }
         lprint!("\n> ");
-        let mut keys = vec!['1', '2', '3', '4'];
+        let mut keys = vec!['1', '2', '3', '4', '6'];
         if fonts.bold.is_some() {
             keys.push('5');
         }
@@ -263,10 +277,11 @@ fn main() {
                 }
             },
             "5" => fonts.bold = None,
+            "6" => test_mode = !test_mode,
             "0" => restore_selected(&mut location, None),
             "" if can_start => {
                 let loc = location.as_ref().expect("validated game path");
-                match deploy::apply(loc, &fonts, ui_scale) {
+                match deploy::apply(loc, &fonts, ui_scale, test_mode) {
                     Ok(()) => {
                         lprintln!("{}", t("config_success"));
                         finish_execution(0);

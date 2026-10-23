@@ -62,6 +62,11 @@ fn lookup(lang: Lang, key: &str) -> &'static str {
 }
 
 const ZH_MESSAGES: &[(&str, &str)] = &[
+    ("menu_test_mode", "测试模式（保留原字体）"),
+    ("test_mode_on", "开启"),
+    ("test_mode_off", "关闭"),
+    ("test_mode_hint", "测试模式仍会更新替换规则；若原字体已被删除，请先还原原始字体，再开启测试模式应用。"),
+    ("test_mode_deploy", "测试模式：保留现有原字体，仅更新本程序的自定义字体和替换配置"),
     ("local_defaults_failed", "读取本机默认设置失败，将使用通用默认值"),
     ("menu_regular", "导入常规字体 (Regular)"),
     ("menu_bold", "导入可选粗体 (Bold，先选择常规字体)"),
@@ -145,6 +150,11 @@ const ZH_MESSAGES: &[(&str, &str)] = &[
 ];
 
 const EN_MESSAGES: &[(&str, &str)] = &[
+    ("menu_test_mode", "Test mode (preserve original fonts)"),
+    ("test_mode_on", "On"),
+    ("test_mode_off", "Off"),
+    ("test_mode_hint", "Replacement rules still apply. If originals were previously removed, restore them before applying test mode."),
+    ("test_mode_deploy", "Test mode: preserving existing original fonts; updating only this program's fonts and replacement configuration"),
     ("local_defaults_failed", "Could not load local defaults; using standard defaults"),
     ("menu_regular", "Import regular font"),
     ("menu_bold", "Import optional bold font (select regular first)"),

@@ -11,7 +11,12 @@ use crate::game::get_fonts_paths;
 use crate::i18n::{t, t_with};
 use crate::lprintln;
 
-pub fn apply(install_location: &str, fonts: &FontSelection, scale: f64) -> io::Result<()> {
+pub fn apply(
+    install_location: &str,
+    fonts: &FontSelection,
+    scale: f64,
+    test_mode: bool,
+) -> io::Result<()> {
     if !fonts.validate() || !scale.is_finite() || !(0.5..=2.0).contains(&scale) {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -48,6 +53,9 @@ pub fn apply(install_location: &str, fonts: &FontSelection, scale: f64) -> io::R
     fs::create_dir_all(&paths.csgo_fonts)?;
     fs::create_dir_all(&paths.core_fonts)?;
 
+    if test_mode {
+        lprintln!("{}", t("test_mode_deploy"));
+    }
     let mut previous = Vec::new();
     for entry in fs::read_dir(&paths.csgo_fonts)? {
         let path = entry?.path();
@@ -56,7 +64,19 @@ pub fn apply(install_location: &str, fonts: &FontSelection, scale: f64) -> io::R
             .and_then(|s| s.to_str())
             .map(|s| s.eq_ignore_ascii_case("ttf") || s.eq_ignore_ascii_case("otf"))
             .unwrap_or(false);
-        if font || path == paths.ui_font {
+        // Test mode only replaces this program's reserved output files. Keep
+        // original fonts and other tools' font files byte-for-byte intact.
+        let managed = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .map(|name| {
+                matches!(
+                    name.to_ascii_lowercase().as_str(),
+                    "cs2fc-regular.ttf" | "cs2fc-regular.otf" | "cs2fc-bold.ttf" | "cs2fc-bold.otf"
+                )
+            })
+            .unwrap_or(false);
+        if (test_mode && managed) || (!test_mode && (font || path == paths.ui_font)) {
             snapshot(&mut previous, &path)?;
         }
     }
